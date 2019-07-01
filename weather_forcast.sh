@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
 ${DIALOG_OK=0}
 ${DIALOG_CANCEL=1}
 
@@ -14,6 +15,11 @@ list_maker(){
 	echo $output
 }
 
+#User info:
+#Current user/all currently logged users - the 'users' command will be useful here
+#User's primary group - the command 'id -gn (username)' (the n option will print the name)
+#User's list of groups (names & numbers) - 'id -G' prints numbers, 'id -Gn' prints names
+#Rework to ensure outputs are human readable
 user_menu(){
 	while true; do
 		choice=$(dialog \
@@ -30,29 +36,55 @@ user_menu(){
 				case $choice in
 					1)
 						dialog_box "Your primary group is $(id -g)";;
+					2)
+						dialog_box "You are a member of groups with the following numbers: $(id -G $(USER))";;
+					3)
+						dialog_box "You are a member of the following groups: $(id -Gn $(USER))";;
 				esac;;
 			$DIALOG_CANCEL)
 				return;;
 		esac
 	done
 }
-
+#System Menu:
+#Number of processors
+#Amount of memory - the 'free -h' command should be useful here
+#Amount of disk space - the 'df -h' command should be useful here
+#How much space the user's home directory is taking up -the 'du -h' command should be useful here
+#Hostname - the 'hostname' expansion/command should be useful here
+#ip address - the 'ip' or 'hostname' commands should be useful here
+#Update 6/30/19
+#Rework to ensure outputs are human readable
+#I believe the third number in the "--menu" line indicates the number of menu options.
 system_menu(){
 	while true; do
 		choice=$(dialog \
 			--backtitle "System Information" \
 			--clear \
-			--menu "You are logged in as ${USER} with id=$(id -u)." 0 0 3 \
-			"1" "Primary group" \
-			"2" "List groups numerically" \
-			"3" "List group names" \
+			--menu "System Information." 0 0 5 \
+			"1" "Number of processors" \
+			"2" "Memory" \
+			"3" "Disk space" \
+			"4" "Home directory size" \
+			"5" "Hostname and IP address" \
 			2>&1 1>&3)
 		return_value=$?
 		case $return_value in
 			$DIALOG_OK)
 				case $choice in
+					#not quite sure how to find processor number yet
 					1)
-						dialog_box "Your primary group is $(id -g)";;
+						dialog_box "The are $(grep -c ^processor /proc/cpuinfo) processors";;
+					2)
+						dialog_box "$(free -h|grep Mem|tr -s ' '|cut -f3 -d ' ') have been used, $(free -h|grep Mem|tr -s ' '|cut -f4 -d ' ') are still free";;
+					#I have no idea how accuarate the output of this command is.
+					3)
+						dialog_box "$(df -h --total|grep total|tr -s ' '|cut -f3 -d ' ') have been used, $(df -h --total|grep total|tr -s ' '|cut -f4 -d ' ') are still free";;
+					4)
+						dialog_box "The user's home directory takes up $(du -s -h ~/ | cut -f1)";;
+					5)
+						#dialog_box "The host is $(hostname) and the IP address is $(ifconfig|grep -A 1 eth0|grep -v eth0|tr -s ' '|cut -f3 -d ' ')";;
+						dialog_box "The host is $(hostname) and the IP address is $(curl -s ipinfo.io/ip)";;
 				esac;;
 			$DIALOG_CANCEL)
 				return;;
@@ -65,17 +97,18 @@ local_menu(){
 		choice=$(dialog \
 			--backtitle "System Information" \
 			--clear \
-			--menu "You are logged in as ${USER} with id=$(id -u)." 0 0 3 \
-			"1" "Primary group" \
-			"2" "List groups numerically" \
-			"3" "List group names" \
+			--menu "Location and Weather." 0 0 2 \
+			"1" "Current Location" \
+			"2" "Weather Forecast" \
 			2>&1 1>&3)
 		return_value=$?
 		case $return_value in
 			$DIALOG_OK)
 				case $choice in
 					1)
-						dialog_box "Your primary group is $(id -g)";;
+						find_location;;
+					2)
+						find_weather;;
 				esac;;
 			$DIALOG_CANCEL)
 				return;;
@@ -83,27 +116,19 @@ local_menu(){
 	done
 }
 
-weather_menu(){
-	while true; do
-		choice=$(dialog \
-			--backtitle "Weather Information" \
-			--clear \
-			--menu "You are logged in as ${USER} with id=$(id -u)." 0 0 3 \
-			"1" "Primary group" \
-			"2" "List groups numerically" \
-			"3" "List group names" \
-			2>&1 1>&3)
-		return_value=$?
-		case $return_value in
-			$DIALOG_OK)
-				case $choice in
-					1)
-						dialog_box "Your primary group is $(id -g)";;
-				esac;;
-			$DIALOG_CANCEL)
-				return;;
-		esac
-	done
+find_location(){
+	curl -s https://ipvigilante.com/$(curl -s ipinfo.io/ip) | \
+	jq '.data.latitude, .data.longitude' | \
+	read -a LOCAL_ARRAY
+	dialog_box "Current latitude is ${LOCAL_ARRAY[0]} and longitude ${LOCAL_ARRAY[1]}"
+}
+
+find_weather(){
+	curl -s https://ipvigilante.com/$(curl -s ipinfo.io/ip) | \
+	jq '.data.latitude, .data.longitude' | \
+	read -a LOCAL_ARRAY
+	curl -s https://api.weather.gov/points/${LOCAL_ARRAY[0]},${LOCAL_ARRAY[1]}
+	dialog_box "Current latitude is ${LOCAL_ARRAY[0]} and longitude ${LOCAL_ARRAY[1]}"
 }
 
 while true; do
@@ -111,11 +136,10 @@ while true; do
 	choice=$(dialog \
 		--backtitle "Information Center - $(date)" \
 		--clear \
-		--menu "Choose from the following:" 0 0 4 \
+		--menu "Choose from the following:" 0 0 3 \
 		"1" "User information" \
 		"2" "System information" \
         "3" "Local information" \
-		"4" "Weather information" \
 		2>&1 1>&3)
 	return_value=$?
 	case $return_value in
@@ -127,11 +151,10 @@ while true; do
 					system_menu;;
                 3)
 					local_menu;;
-				4)
-					weather_menu;;
 			esac;;
 		$DIALOG_CANCEL)
 			exec 3>&-
+			clear
 			echo "Thanks!";
 			exit;;
 	esac

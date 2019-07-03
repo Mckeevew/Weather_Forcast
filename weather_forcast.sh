@@ -117,18 +117,29 @@ local_menu(){
 }
 
 find_location(){
-	curl -s https://ipvigilante.com/$(curl -s ipinfo.io/ip) | \
-	jq '.data.latitude, .data.longitude' | \
-	read -a LOCAL_ARRAY
-	dialog_box "Current latitude is ${LOCAL_ARRAY[0]} and longitude ${LOCAL_ARRAY[1]}"
+	echo 0 | dialog --title "Getting IP Address." --gauge "Please wait ...." 10 60
+	myIP=$(curl -s ipinfo.io/ip)
+	echo 33 | dialog --title "Getting Latitude." --gauge "Please wait ...." 10 60
+	lat=$(curl -s https://ipvigilante.com/$myIP|jq '.data.latitude'|tr -d '"')
+	echo 66 | dialog --title "Getting Longitude." --gauge "Please wait ...." 10 60
+	long=$(curl -s https://ipvigilante.com/$myIP|jq '.data.longitude'|tr -d '"')
+	echo 100 | dialog --title "Finalizing." --gauge "Done ...." 10 60
+	dialog_box "Current latitude is ${lat} and longitude is ${long}"
 }
 
 find_weather(){
-	curl -s https://ipvigilante.com/$(curl -s ipinfo.io/ip) | \
-	jq '.data.latitude, .data.longitude' | \
-	read -a LOCAL_ARRAY
-	curl -s https://api.weather.gov/points/${LOCAL_ARRAY[0]},${LOCAL_ARRAY[1]}
-	dialog_box "Current latitude is ${LOCAL_ARRAY[0]} and longitude ${LOCAL_ARRAY[1]}"
+	echo 0 | dialog --title "Getting IP Address." --gauge "Please wait ...." 10 60
+	myIP=$(curl -s ipinfo.io/ip)
+	echo 20 | dialog --title "Getting Latitude." --gauge "Please wait ...." 10 60
+	lat=$(curl -s https://ipvigilante.com/$myIP|jq '.data.latitude'|tr -d '"'|sed 's/.$//')
+	echo 40 | dialog --title "Getting Longitude." --gauge "Please wait ...." 10 60
+	long=$(curl -s https://ipvigilante.com/$myIP|jq '.data.longitude'|tr -d '"'|sed 's/.$//')
+	echo 60 | dialog --title "Getting Forcast Link." --gauge "Please wait ...." 10 60
+	forcastLink=$(curl -s https://api.weather.gov/points/${lat},${long}|jq '.properties.forecast' | tr -d '"')
+	echo 80 | dialog --title "Getting Forcast Information." --gauge "Please wait ...." 10 60
+	currentForcast=$(curl -s $forcastLink | jq '.properties.periods[0].detailedForecast' | tr -d '"')
+	echo 100 | dialog --title "Finalizing." --gauge "Done ...." 10 60
+	dialog_box "$currentForcast"
 }
 
 while true; do
